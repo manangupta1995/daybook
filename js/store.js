@@ -1,7 +1,7 @@
 // Local data store: records carry updatedAt; deletes are tombstones; merge is newest-wins per record.
 import { uid, nowIso, today, addDays, weekday } from './util.js';
 
-export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'logs', 'devices'];
+export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'logs', 'devices', 'config'];
 const KEY = 'daybook.db.v2';
 const TOMBSTONE_DAYS = 90;
 

@@ -1,7 +1,8 @@
 name: reminders
 
 # Sends phone notifications for task reminders and habit reminder times.
-# Needs repository secrets: DATA_TOKEN (the same fine-grained token the app uses) and VAPID_PRIVATE_KEY.
+# Needs repository secrets: DATA_TOKEN (the same fine-grained token the app uses) and VAPID_PRIVATE_KEY
+# (create it with Settings → Reminders → Generate reminder keys in the app). The public key is read from the data file.
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -30,5 +31,4 @@ jobs:
         env:
           DATA_TOKEN: ${{ secrets.DATA_TOKEN }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_PUBLIC_KEY: BNtUk4DM9QxrZYvJvp064vlnVkDITYw0Xctk0GNHkMkmo4byEZlPFJu887D3cWsr5HSBH8LPN6jBC9pT8UaOTG4
         run: node send.mjs

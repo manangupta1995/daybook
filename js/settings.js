@@ -18,6 +18,19 @@ export function syncLabel() {
   return status.lastSynced ? `Synced ${status.lastSynced.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Ready';
 }
 
+let freshKeys = null; // private key, shown once, only in memory
+const SECRETS_URL = 'https://github.com/manangupta1995/daybook/settings/secrets/actions/new';
+function keysBlock() {
+  const cfg = getCfg();
+  if (freshKeys) return `<div class="keybox"><p><b>Save the private key now.</b> It is shown only once and is not stored anywhere.</p>
+    <ol class="steps"><li>Copy the private key below.</li><li>Open <a href="${SECRETS_URL}" target="_blank" rel="noopener">GitHub → new repository secret</a> in <b>daybook</b>, name it <code>VAPID_PRIVATE_KEY</code> and paste the key.</li>
+    <li>Add a second secret named <code>DATA_TOKEN</code> with the same access token you pasted into this app (needs Contents read and write on <b>daybook-data</b>).</li></ol>
+    <textarea readonly rows="2" data-key aria-label="Private key" onfocus="this.select()">${esc(freshKeys)}</textarea>
+    <div class="btnrow"><button class="btn" data-act="keys-copy">Copy private key</button><button class="btn ghost" data-act="keys-done">I've saved it</button></div></div>`;
+  if (!push.hasKeys()) return `<p class="muted"><b>Step 1.</b> Create the keys that let your GitHub job send notifications to your phone. Do this once, on any device.</p><div class="btnrow"><button class="btn" data-act="keys-gen">Generate reminder keys</button></div>`;
+  return `<p class="muted small">Reminder keys are set up (public key <code>${esc(push.publicKey().slice(0, 10))}…</code>). If you lost the private key or want to start over, <button class="linklike" data-act="keys-gen">generate new keys</button>; that signs out every device and needs the GitHub secret updated.</p>`;
+}
+
 function notifyCard() {
   if (!push.info.ready) { push.refreshInfo().then(rerender); return '<section class="card"><h3>Reminders</h3><p class="muted">Checking this device…</p></section>'; }
   const i = push.info;
@@ -27,7 +40,7 @@ function notifyCard() {
   else if (i.permission === 'denied') body = `<p class="muted">Notifications are blocked for Daybook. On iPhone open Settings → Notifications → Daybook and allow them, then come back.</p>`;
   else if (!i.subscribed) body = `<p class="muted">Get a notification for task reminders and habit reminder times. Turn this on <b>only on your phone</b>.</p><div class="btnrow"><button class="btn" data-act="push-on">Turn on reminders on this device</button></div>`;
   else body = `<div class="syncline ok"><span class="dot"></span><span>Reminders are on for this device</span></div><div class="btnrow"><button class="btn ghost" data-act="push-test">Show a test notification</button><button class="btn danger ghost" data-act="push-off">Turn off</button></div>`;
-  return `<section class="card"><h3>Reminders</h3>${body}<p class="muted small">${devices.length ? `${devices.length} device${devices.length === 1 ? '' : 's'} registered (${esc(devices.map((d) => d.name).join(', '))}). ` : ''}A scheduled job on GitHub sends them, so one can arrive a few minutes after its time.</p></section>`;
+  return `<section class="card"><h3>Reminders</h3>${keysBlock()}${push.hasKeys() && !freshKeys ? body : ''}<p class="muted small">${devices.length ? `${devices.length} device${devices.length === 1 ? '' : 's'} registered (${esc(devices.map((d) => d.name).join(', '))}). ` : ''}A scheduled job on GitHub sends them, so one can arrive a few minutes after its time.</p></section>`;
 }
 
 export function renderSettings() {
@@ -70,6 +83,12 @@ registerFields({
 });
 
 registerActions({
+  'keys-gen': async (el) => {
+    if (push.hasKeys() && !armed(el, 'Tap again: this signs out all devices')) return;
+    try { const k = await push.generateKeys(); freshKeys = k.privateKey; rerender(); } catch (e) { toast('Could not generate keys: ' + e.message); }
+  },
+  'keys-copy': async () => { try { await navigator.clipboard.writeText(freshKeys); toast('Private key copied'); } catch { document.querySelector('[data-key]')?.select(); toast('Select the key and copy it manually'); } },
+  'keys-done': () => { freshKeys = null; rerender(); },
   'push-on': async (el) => { el.disabled = true; try { await push.enable(); toast('Reminders are on for this device'); } catch (e) { toast(e.message || 'Could not turn on reminders'); } el.disabled = false; rerender(); },
   'push-off': async () => { await push.disable(); toast('Reminders turned off for this device'); rerender(); },
   'push-test': async () => { try { await push.testLocal(); } catch (e) { toast('Could not show a notification: ' + e.message); } },

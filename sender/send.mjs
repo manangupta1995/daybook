@@ -2,12 +2,12 @@
 import { computeDue } from './due.mjs';
 import { sendPush } from './webpush.mjs';
 
-const { DATA_TOKEN, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT = 'https://manangupta1995.github.io/daybook/' } = process.env;
+const { DATA_TOKEN, VAPID_PRIVATE_KEY, VAPID_SUBJECT = 'https://manangupta1995.github.io/daybook/' } = process.env;
 const REPO = process.env.DATA_REPO || 'manangupta1995/daybook-data';
 const DEFAULT_TZ = 'America/Los_Angeles';
 const MAX_CATCHUP = 2 * 3600e3;
 
-if (!DATA_TOKEN || !VAPID_PRIVATE_KEY || !VAPID_PUBLIC_KEY) { console.log('Missing DATA_TOKEN or VAPID keys. Add them as repository secrets. Nothing sent.'); process.exit(0); }
+if (!DATA_TOKEN || !VAPID_PRIVATE_KEY) { console.log('Missing DATA_TOKEN or VAPID_PRIVATE_KEY. Add them as repository secrets. Nothing sent.'); process.exit(0); }
 
 const gh = (path, opts = {}) => fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, { ...opts, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${DATA_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) } });
 async function getJson(path) {
@@ -25,6 +25,8 @@ async function putJson(path, data, sha, message) {
 const now = Date.now();
 const [{ data: db }, { data: state, sha: stateSha }] = await Promise.all([getJson('data.json'), getJson('state.json')]);
 if (!db) { console.log('No data.json yet.'); process.exit(0); }
+const VAPID_PUBLIC_KEY = db.config?.push?.publicKey || process.env.VAPID_PUBLIC_KEY;
+if (!VAPID_PUBLIC_KEY) { console.log('No reminder keys generated yet (Settings → Reminders).'); process.exit(0); }
 const devices = Object.values(db.devices || {}).filter((d) => !d.deleted && d.endpoint);
 if (!devices.length) { console.log('No subscribed devices.'); process.exit(0); }
 

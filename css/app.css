@@ -303,3 +303,7 @@ body.sheet-open{overflow:hidden}
 .total.ok .tin input{color:var(--cx,var(--c))}
 .tin input::-webkit-outer-spin-button,.tin input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.tin input{-moz-appearance:textfield}
 .tl-task.short{flex-direction:row;align-items:center;gap:8px;padding:0 8px}.tl-task.short span{white-space:nowrap}
+.keybox{border:1px solid var(--p2);background:color-mix(in srgb,var(--p2) 8%,var(--surface));border-radius:12px;padding:12px;margin-bottom:12px}
+.keybox p{margin:0 0 8px}.keybox textarea{font:12px var(--mono);word-break:break-all;margin-top:8px}
+.linklike{color:var(--accent);text-decoration:underline;font-size:inherit}
+.keybox a{color:var(--accent);text-decoration:underline}
