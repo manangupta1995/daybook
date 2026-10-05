@@ -1,7 +1,7 @@
 // Local data store: records carry updatedAt; deletes are tombstones; merge is newest-wins per record.
 import { uid, nowIso, today, addDays, weekday } from './util.js';
 
-export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'logs'];
+export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'logs', 'devices'];
 const KEY = 'daybook.db.v2';
 const TOMBSTONE_DAYS = 90;
 
@@ -69,7 +69,9 @@ export function tagsInUse() {
 // ---- writes ----
 export function put(coll, rec) {
   const prev = db[coll][rec.id] || {};
-  db[coll][rec.id] = { ...prev, ...rec, updatedAt: nowIso() };
+  const next = { ...prev, ...rec, updatedAt: nowIso() };
+  delete next.deleted; // writing to a record revives it
+  db[coll][rec.id] = next;
   commit();
   return db[coll][rec.id];
 }
@@ -147,6 +149,8 @@ export function setLog(h, date, value) {
   const done = h.type === 'check' ? !!value : value >= h.goal;
   put('logs', { id: logKey(h.id, date), habitId: h.id, date, value: h.type === 'check' ? (value ? 1 : 0) : Math.max(0, value), done });
 }
+
+export function clearLog(h, date) { if (db.logs[logKey(h.id, date)]) { tombstone('logs', logKey(h.id, date)); commit(); } }
 
 export function toggleHabit(h, date) { setLog(h, date, isDone(h, date) ? 0 : (h.type === 'check' ? 1 : h.goal)); }
 export function stepHabit(h, date, dir) {

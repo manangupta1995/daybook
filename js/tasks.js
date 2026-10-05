@@ -215,13 +215,14 @@ export function handleQuick(form) {
   const input = form.querySelector('input');
   const raw = input.value.trim();
   if (!raw) return;
-  const [kind, a, b] = form.dataset.quick.split(':');
+  const [kind, a, b, c2, c3] = form.dataset.quick.split(':');
   const p = parseQuick(raw);
   const base = { title: p.title, priority: p.priority, tags: p.tags, date: p.date };
   if (kind === 'today') S.addTask({ ...base, listId: 'inbox', date: p.date || today() });
   else if (kind === 'list') S.addTask({ ...base, listId: a });
   else if (kind === 'section') S.addTask({ ...base, listId: b, sectionId: a });
   else if (kind === 'day') S.addTask({ ...base, listId: 'inbox', date: a });
+  else if (kind === 'slot') { S.addTask({ ...base, listId: 'inbox', date: a, time: `${b}:${c2}` }); closeSheet(); }
   input.value = '';
   rerender();
   requestAnimationFrame(() => document.querySelector(`[data-quick="${form.dataset.quick}"] input`)?.focus());

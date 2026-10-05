@@ -1,0 +1,34 @@
+name: reminders
+
+# Sends phone notifications for task reminders and habit reminder times.
+# Needs repository secrets: DATA_TOKEN (the same fine-grained token the app uses) and VAPID_PRIVATE_KEY.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: sender
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Send due reminders
+        working-directory: sender
+        env:
+          DATA_TOKEN: ${{ secrets.DATA_TOKEN }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC_KEY: BNtUk4DM9QxrZYvJvp064vlnVkDITYw0Xctk0GNHkMkmo4byEZlPFJu887D3cWsr5HSBH8LPN6jBC9pT8UaOTG4
+        run: node send.mjs

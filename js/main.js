@@ -3,7 +3,7 @@ import { esc } from './util.js';
 import * as S from './store.js';
 import { icons, dispatchAction, dispatchField, registerActions, closeSheet, refreshSheet, sheetOpen, uiGet, uiSet } from './ui.js';
 import { renderToday, renderList, renderTag, handleQuick, openNewList } from './tasks.js';
-import { renderCalendar } from './calendar.js';
+import { renderCalendar, calendarMounted } from './calendar.js';
 import { renderHabits } from './habits.js';
 import { renderSettings, applyTheme, syncLabel } from './settings.js';
 import { startAutoSync, onStatus, status, getCfg } from './sync.js';
@@ -80,6 +80,7 @@ export function render() {
   $('#view').innerHTML = body(r);
   document.title = 'Daybook';
   window.scrollTo(0, y);
+  if (r.name === 'calendar') calendarMounted();
   pending = false;
 }
 

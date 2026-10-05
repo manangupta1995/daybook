@@ -2,6 +2,7 @@
 import { esc } from './util.js';
 import * as S from './store.js';
 import { getCfg, setCfg, syncNow, status, testConnection } from './sync.js';
+import * as push from './push.js';
 import { icons, registerActions, registerFields, armed, toast, rerender } from './ui.js';
 
 export function applyTheme() {
@@ -15,6 +16,18 @@ export function syncLabel() {
   if (status.state === 'offline') return 'Offline';
   if (status.state === 'error') return 'Sync problem';
   return status.lastSynced ? `Synced ${status.lastSynced.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Ready';
+}
+
+function notifyCard() {
+  if (!push.info.ready) { push.refreshInfo().then(rerender); return '<section class="card"><h3>Reminders</h3><p class="muted">Checking this device…</p></section>'; }
+  const i = push.info;
+  const devices = S.live('devices');
+  let body;
+  if (!i.supported) body = `<p class="muted">This browser can't receive reminders. On iPhone, tap Share → <b>Add to Home Screen</b>, then open Daybook from its icon and come back here.</p>`;
+  else if (i.permission === 'denied') body = `<p class="muted">Notifications are blocked for Daybook. On iPhone open Settings → Notifications → Daybook and allow them, then come back.</p>`;
+  else if (!i.subscribed) body = `<p class="muted">Get a notification for task reminders and habit reminder times. Turn this on <b>only on your phone</b>.</p><div class="btnrow"><button class="btn" data-act="push-on">Turn on reminders on this device</button></div>`;
+  else body = `<div class="syncline ok"><span class="dot"></span><span>Reminders are on for this device</span></div><div class="btnrow"><button class="btn ghost" data-act="push-test">Show a test notification</button><button class="btn danger ghost" data-act="push-off">Turn off</button></div>`;
+  return `<section class="card"><h3>Reminders</h3>${body}<p class="muted small">${devices.length ? `${devices.length} device${devices.length === 1 ? '' : 's'} registered (${esc(devices.map((d) => d.name).join(', '))}). ` : ''}A scheduled job on GitHub sends them, so one can arrive a few minutes after its time.</p></section>`;
 }
 
 export function renderSettings() {
@@ -36,6 +49,7 @@ export function renderSettings() {
       <li>Under <b>Permissions → Repository permissions</b> set <b>Contents</b> to <b>Read and write</b>. Nothing else.</li>
       <li>Generate, copy the token, and paste it above. It is stored only in this browser.</li></ol></details>
   </section>
+  ${notifyCard()}
   <section class="card"><h3>Appearance</h3>
     <div class="row two"><div><label>Theme</label><select data-field="set:theme" aria-label="Theme">${[['auto', 'Match device'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<option value="${v}" ${(c.theme || 'auto') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div><label>Week starts on</label><select data-field="set:week" aria-label="Week starts on"><option value="1" ${String(c.weekStart ?? 1) === '1' ? 'selected' : ''}>Monday</option><option value="0" ${String(c.weekStart ?? 1) === '0' ? 'selected' : ''}>Sunday</option></select></div></div>
@@ -56,6 +70,9 @@ registerFields({
 });
 
 registerActions({
+  'push-on': async (el) => { el.disabled = true; try { await push.enable(); toast('Reminders are on for this device'); } catch (e) { toast(e.message || 'Could not turn on reminders'); } el.disabled = false; rerender(); },
+  'push-off': async () => { await push.disable(); toast('Reminders turned off for this device'); rerender(); },
+  'push-test': async () => { try { await push.testLocal(); } catch (e) { toast('Could not show a notification: ' + e.message); } },
   'sync-now': () => { syncNow(); },
   'set-connect': async (el) => {
     const tokenEl = document.querySelector('[data-field="set:token"]');
