@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Daybook</title>
+<meta name="theme-color" content="#F6F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Personal tasks, calendar and habits.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daybook">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side"></aside>
+  <div id="col">
+    <header id="topbar"><div class="brand"><span class="logo"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>Daybook</b></div><div id="topsync"></div></header>
+    <main id="main"><div id="view"></div></main>
+  </div>
+  <nav id="tabs" aria-label="Main"></nav>
+</div>
+<div id="sheet" hidden>
+  <div class="backdrop" data-act="sheet-close"></div>
+  <div class="sheet-panel" role="dialog" aria-modal="true"><div class="sheet-grab"></div><div class="sheet-body"></div></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript>Daybook needs JavaScript.</noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
