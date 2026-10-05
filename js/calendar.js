@@ -88,7 +88,7 @@ function renderDay() {
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
   const showNow = selected === t0 && nowMin >= base && nowMin <= (last + 1) * 60;
   const fmt = (m) => { const h = Math.floor(m / 60) % 24, mm = m % 60; return `${((h + 11) % 12) + 1}${mm ? ':' + String(mm).padStart(2, '0') : ''}${h >= 12 ? 'p' : 'a'}`; };
-  const blocks = items.map((i, idx) => `<button class="tl-task p${i.t.priority} ${i.t.done ? 'done' : ''} ${idx === 0 ? 'tl-first' : ''}" data-act="task-open" data-id="${i.t.id}"
+  const blocks = items.map((i, idx) => `<button class="tl-task p${i.t.priority} ${i.t.done ? 'done' : ''} ${idx === 0 ? 'tl-first' : ''} ${(i.end - i.start) < 45 ? 'short' : ''}" data-act="task-open" data-id="${i.t.id}"
       style="top:${((i.start - base) / 60) * HOUR}px;height:${Math.max(((i.end - i.start) / 60) * HOUR - 2, 22)}px;left:calc(${(i.col / i.n) * 100}% + 2px);width:calc(${100 / i.n}% - 4px)">
       <b>${esc(i.t.title)}</b><span>${fmt(i.start)}–${fmt(i.end)}</span></button>`).join('');
   return `<div class="page-head"><div><h1>${esc(friendlyDate(selected))}</h1><p class="sub">${esc(MONTHS_LONG[d.getMonth()])} ${d.getDate()}, ${d.getFullYear()} · ${all.filter((t) => !t.done).length} open</p></div>
