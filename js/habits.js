@@ -1,7 +1,8 @@
 // Habit tracker: daily list, per-habit detail with history, editor.
 import { esc, uid, today, addDays, ymd, parseYmd, friendlyDate, fmtTime, MONTHS_LONG, DOW_SHORT } from './util.js';
 import * as S from './store.js';
-import { icons, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, uiGet, uiSet, toast } from './ui.js';
+import { registerDnd } from './dnd.js';
+import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, uiGet, uiSet, toast } from './ui.js';
 import { getCfg } from './sync.js';
 
 let day = today();       // date being tracked on the main screen
@@ -28,11 +29,11 @@ function control(h, d) {
     <button data-act="habit-step" data-dir="1" data-id="${h.id}" data-d="${d}" aria-label="More">${icons.plus}</button></div>`;
 }
 
-function card(h, d) {
+function card(h, d, { drag = false, dim = false } = {}) {
   const st = S.habitStats(h);
   const sched = (h.schedule?.freq === 'weekly') ? (h.schedule.days || []).map((x) => DOW_SHORT[x]).join(' ') : 'Daily';
-  return `<div class="habit" style="--c:${hcolor(h)}">
-    <button class="hmain" data-act="habit-open" data-id="${h.id}">
+  return `<div class="habit ${dim ? 'dim' : ''}" style="--c:${hcolor(h)}" ${drag ? `data-dnd-item data-id="${h.id}"` : ''}>
+    ${drag ? grip(h.id, h.name) : ''}<button class="hmain" data-act="habit-open" data-id="${h.id}">
       <span class="hdot">${icons.flame}</span>
       <span class="htext"><b>${esc(h.name)}</b><span class="hsub">${st.streak ? `<em>${st.streak}-day streak</em> · ` : ''}${esc(sched)}${h.type === 'amount' ? ` · goal ${h.goal}${unitLabel(h)}` : ''}</span></span></button>
     ${control(h, d)}</div>`;
@@ -49,8 +50,8 @@ export function renderHabits() {
   return `<div class="page-head"><div><h1>Habits</h1><p class="sub">${due.length ? `${done} of ${due.length} done` : 'Nothing scheduled'}</p></div>
       <div class="head-actions"><button class="icon-btn" data-act="habit-new">${icons.plus} New</button></div></div>
     <div class="daynav"><button class="icon-btn" data-act="habit-day" data-n="-1" aria-label="Previous day">${icons.chevL}</button><button class="daylabel" data-act="habit-day" data-n="0">${esc(friendlyDate(day))}${isToday ? '' : ' · back to today'}</button><button class="icon-btn" data-act="habit-day" data-n="1" aria-label="Next day" ${day >= today() ? 'disabled' : ''}>${icons.chevR}</button></div>
-    ${due.map((h) => card(h, day)).join('') || '<div class="empty">' + icons.habit + '<p>No habits due this day.</p></div>'}
-    ${other.length ? `<h3 class="sechead">Not scheduled</h3>${other.map((h) => `<div class="dim">${card(h, day)}</div>`).join('')}` : ''}
+    <div class="hzone" data-dnd-zone data-group="habits" data-zone="due">${due.map((h) => card(h, day, { drag: true })).join('')}</div>${due.length ? '' : '<div class="empty">' + icons.habit + '<p>No habits due this day.</p></div>'}
+    ${other.length ? `<h3 class="sechead">Not scheduled</h3><div class="hzone" data-dnd-zone data-group="habits" data-zone="other">${other.map((h) => card(h, day, { drag: true, dim: true })).join('')}</div>` : ''}
     ${archived.length ? `<details class="group"><summary>Archived<span class="count">${archived.length}</span></summary>${archived.map((h) => card(h, day)).join('')}</details>` : ''}`;
 }
 
@@ -149,4 +150,15 @@ registerActions({
   },
   'hb-archive': () => { S.patch('habits', editing.id, { archived: !editing.archived }); closeSheet(); rerender(); },
   'hb-del': (el) => { if (!armed(el, 'Tap again to delete')) return; S.remove('habits', editing.id); closeSheet(); toast('Habit deleted'); rerender(); },
+});
+
+// Habits share one overall order. Put the moved habit next to the neighbour it was dropped beside, then renumber all.
+registerDnd('habits', ({ id, zoneIds }) => {
+  const all = S.live('habits').filter((h) => !h.archived).sort(S.byOrder).map((h) => h.id).filter((x) => x !== id);
+  const i = zoneIds.indexOf(id);
+  const next = zoneIds[i + 1], prev = zoneIds[i - 1];
+  if (next) all.splice(all.indexOf(next), 0, id);
+  else if (prev) all.splice(all.indexOf(prev) + 1, 0, id);
+  else all.push(id);
+  S.putMany('habits', all.map((hid, n) => ({ id: hid, sortOrder: n * 1e9 })));
 });

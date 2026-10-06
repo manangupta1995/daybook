@@ -26,6 +26,8 @@ export const icons = {
   menu: I('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   clock: I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
   sub: I('<path d="M6 4v8a3 3 0 0 0 3 3h9M14.5 11.5L18 15l-3.5 3.5"/>'),
+  grip: I('<circle cx="9" cy="6" r="1.1"/><circle cx="15" cy="6" r="1.1"/><circle cx="9" cy="12" r="1.1"/><circle cx="15" cy="12" r="1.1"/><circle cx="9" cy="18" r="1.1"/><circle cx="15" cy="18" r="1.1"/>'),
+  up: I('<path d="M6 14.5l6-6 6 6"/>'),
   alert: I('<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.5v.1"/>'),
 };
 
@@ -77,6 +79,7 @@ export const sheetOpen = () => !document.getElementById('sheet').hidden && !!she
 
 export const COLORS = ['#2F6F4F', '#4C8DD6', '#6E75F4', '#35A86B', '#D6A22E', '#D9673B', '#C4452F', '#B04C8F', '#7A8A82'];
 export const swatch = (colors, cur, act) => colors.map((c) => `<button type="button" class="sw ${c === cur ? 'on' : ''}" style="--c:${c}" data-act="${act}" data-color="${c}" aria-label="Colour ${c}"></button>`).join('');
+export const grip = (id, label) => `<button class="grip" data-drag data-id="${id}" aria-label="Reorder ${esc(label)}. Drag, or use the up and down arrow keys" title="Drag to reorder">${icons.grip}</button>`;
 export { esc };
 
 // ---- field change registry (inputs inside sheets / views) ----

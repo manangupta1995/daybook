@@ -32,7 +32,7 @@ function keysBlock() {
 }
 
 function notifyCard() {
-  if (!push.info.ready) { push.refreshInfo().then(rerender); return '<section class="card"><h3>Reminders</h3><p class="muted">Checking this device…</p></section>'; }
+  if (!push.info.ready) { push.refreshInfo().then(() => { if (!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) rerender(); }); return '<section class="card"><h3>Reminders</h3><p class="muted">Checking this device…</p></section>'; }
   const i = push.info;
   const devices = S.live('devices');
   let body;

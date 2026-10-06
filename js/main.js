@@ -1,7 +1,9 @@
 // App shell: routing, navigation, event wiring.
 import { esc } from './util.js';
 import * as S from './store.js';
-import { icons, dispatchAction, dispatchField, registerActions, closeSheet, refreshSheet, sheetOpen, uiGet, uiSet } from './ui.js';
+import './dnd.js';
+import { dragging, registerDnd, computeOrder } from './dnd.js';
+import { icons, grip, dispatchAction, dispatchField, registerActions, closeSheet, refreshSheet, sheetOpen, uiGet, uiSet } from './ui.js';
 import { renderToday, renderList, renderTag, handleQuick, openNewList } from './tasks.js';
 import { renderCalendar, calendarMounted } from './calendar.js';
 import { renderHabits } from './habits.js';
@@ -22,13 +24,19 @@ function listNav() {
   const open = {}; S.live('tasks').forEach((t) => { if (!t.done && !t.parentId) open[t.listId] = (open[t.listId] || 0) + 1; });
   const r = route();
   const item = (l) => `<a class="nav-item ${r.name === 'list' && r.arg === l.id ? 'on' : ''}" href="#/list/${l.id}"><span class="lico" style="--c:${l.color || 'var(--muted)'}">${l.id === 'inbox' ? icons.inbox : l.kind === 'notes' ? icons.note : '<i></i>'}</span><span class="lname">${esc(l.name)}</span><span class="lcount">${open[l.id] || ''}</span></a>`;
+  const row = (l) => `<div class="navrow" data-dnd-item data-id="${l.id}">${item(l)}${grip(l.id, l.name)}</div>`;
   const inbox = lists.find((l) => l.id === 'inbox');
   const loose = lists.filter((l) => l.id !== 'inbox' && !folders.find((f) => f.id === l.folderId));
   const tags = S.tagsInUse();
-  return `${inbox ? item(inbox) : ''}${loose.map(item).join('')}
-    ${folders.map((f) => { const inside = lists.filter((l) => l.folderId === f.id); const col = uiGet('fold:' + f.id, false); return `<div class="folder"><div class="fhead"><button class="fbtn" data-act="folder-toggle" data-id="${f.id}" aria-expanded="${!col}">${col ? icons.chevR : icons.chevD}${esc(f.name)}</button><button class="mini" data-act="folder-open" data-id="${f.id}" aria-label="Folder options">${icons.dots}</button></div>${col ? '' : inside.map(item).join('')}</div>`; }).join('')}
+  return `${inbox ? item(inbox) : ''}<div class="zone" data-dnd-zone data-group="lists" data-zone="">${loose.map(row).join('')}</div>
+    ${folders.map((f) => { const inside = lists.filter((l) => l.folderId === f.id); const col = uiGet('fold:' + f.id, false); return `<div class="folder" data-dnd-zone data-group="lists" data-zone="${f.id}"><div class="fhead"><button class="fbtn" data-act="folder-toggle" data-id="${f.id}" aria-expanded="${!col}">${col ? icons.chevR : icons.chevD}${esc(f.name)}</button><button class="mini" data-act="folder-open" data-id="${f.id}" aria-label="Folder options">${icons.dots}</button></div>${col ? '' : inside.map(row).join('')}</div>`; }).join('')}
     ${tags.length ? `<div class="tagnav"><h4>Tags</h4>${tags.map((g) => `<a class="chip tag ${r.name === 'tag' && r.arg === g ? 'on' : ''}" href="#/tag/${encodeURIComponent(g)}">#${esc(g)}</a>`).join('')}</div>` : ''}`;
 }
+
+registerDnd('lists', ({ id, zone, zoneIds }) => {
+  const upd = computeOrder(zoneIds, id, (x) => S.get('lists', x)?.sortOrder ?? 0);
+  S.putMany('lists', Object.entries(upd).map(([lid, sortOrder]) => ({ id: lid, sortOrder, ...(lid === id ? { folderId: zone || null } : {}) })));
+});
 
 registerActions({
   'folder-toggle': (el) => { uiSet('fold:' + el.dataset.id, !uiGet('fold:' + el.dataset.id, false)); render(); },
@@ -84,7 +92,7 @@ export function render() {
   pending = false;
 }
 
-const typing = () => { const a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'noop'; };
+const typing = () => { if (dragging()) return true; const a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'noop'; };
 
 S.onChange((kind) => {
   if (kind === 'remote' && typing()) { pending = true; return; }

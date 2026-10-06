@@ -76,6 +76,13 @@ export function put(coll, rec) {
   return db[coll][rec.id];
 }
 
+// Write several records with one save and one re-render.
+export function putMany(coll, recs) {
+  const t = nowIso();
+  recs.forEach((rec) => { const next = { ...(db[coll][rec.id] || {}), ...rec, updatedAt: t }; delete next.deleted; db[coll][rec.id] = next; });
+  commit();
+}
+
 export function patch(coll, id, fields) {
   if (!db[coll][id]) return null;
   return put(coll, { id, ...fields });

@@ -1,7 +1,8 @@
 // Task views: Today, list, tag; task sheet; list/folder management.
 import { esc, uid, today, addDays, diffDays, friendlyDate, fmtTime, weekday } from './util.js';
 import * as S from './store.js';
-import { icons, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, focusField, uiGet, uiSet, toast } from './ui.js';
+import { registerDnd, computeOrder } from './dnd.js';
+import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, focusField, uiGet, uiSet, toast } from './ui.js';
 
 const PRIO = ['None', 'Low', 'Medium', 'High'];
 const DAYS = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
@@ -29,7 +30,7 @@ function dueChip(t) {
   return `<span class="chip ${cls}">${icons.calendar}${esc(friendlyDate(t.date))}${t.time ? ' · ' + fmtTime(t.time) : ''}</span>`;
 }
 
-export function taskRow(t, { showList = false, indent = false } = {}) {
+export function taskRow(t, { showList = false, indent = false, drag = false } = {}) {
   const kids = S.live('tasks').filter((k) => k.parentId === t.id);
   const doneKids = kids.filter((k) => k.done).length;
   const list = showList ? S.get('lists', t.listId) : null;
@@ -38,7 +39,7 @@ export function taskRow(t, { showList = false, indent = false } = {}) {
     <div class="tbody" data-act="task-open" data-id="${t.id}">
       <div class="ttitle">${esc(t.title) || '<i>Untitled</i>'}</div>
       <div class="tmeta">${dueChip(t)}${list ? `<span class="chip plain">${esc(list.name)}</span>` : ''}${(t.tags || []).map((g) => `<span class="chip tag">#${esc(g)}</span>`).join('')}${kids.length ? `<span class="chip plain">${icons.sub}${doneKids}/${kids.length}</span>` : ''}${t.notes ? `<span class="chip plain">${icons.note}</span>` : ''}</div>
-    </div>
+    </div>${drag ? grip(t.id, t.title) : ''}
   </div>`;
 }
 
@@ -93,18 +94,21 @@ export function renderList(id) {
   }
 
   const sections = S.live('sections').filter((s) => s.listId === id).sort(S.byOrder);
+  const manual = mode === 'manual';
   const render = (arr) => sortTasks(arr.filter((t) => !t.done), mode).map((t) => {
     const kids = sortTasks(all.filter((k) => k.parentId === t.id && !k.done), mode);
     const doneKids = showDone ? sortTasks(all.filter((k) => k.parentId === t.id && k.done), 'manual') : [];
-    return taskRow(t) + [...kids, ...doneKids].map((k) => taskRow(k, { indent: true })).join('');
+    const inner = taskRow(t, { drag: manual }) + [...kids, ...doneKids].map((k) => taskRow(k, { indent: true })).join('');
+    return manual ? `<div class="tgroup" data-dnd-item data-id="${t.id}">${inner}</div>` : inner;
   }).join('');
+  const zoneAttr = (sid) => (manual ? `data-dnd-zone data-group="tasks:${id}" data-zone="${sid || ''}"` : '');
   const noSec = tops.filter((t) => !t.sectionId || !sections.find((s) => s.id === t.sectionId));
   let body = '';
   const loose = render(noSec);
-  if (loose) body += `<section class="group">${sections.length ? '<h3>No section</h3>' : ''}${loose}</section>`;
+  if (loose || (manual && sections.length)) body += `<section class="group ${loose ? '' : 'zone-empty'}" ${zoneAttr('')}>${sections.length ? '<h3>No section</h3>' : ''}${loose}</section>`;
   sections.forEach((s) => {
     const arr = tops.filter((t) => t.sectionId === s.id);
-    body += `<section class="group"><h3>${esc(s.name)}<span class="count">${arr.filter((t) => !t.done).length}</span><button class="mini" data-act="section-add" data-id="${s.id}" aria-label="Add task to ${esc(s.name)}">${icons.plus}</button></h3>
+    body += `<section class="group" ${zoneAttr(s.id)}><h3>${esc(s.name)}<span class="count">${arr.filter((t) => !t.done).length}</span><button class="mini" data-act="section-add" data-id="${s.id}" aria-label="Add task to ${esc(s.name)}">${icons.plus}</button></h3>
       ${uiGet('addsec', null) === s.id ? quickAdd('section:' + s.id + ':' + id, `Add to ${s.name}…`) : ''}${render(arr)}</section>`;
   });
   const doneAll = tops.filter((t) => t.done);
@@ -287,7 +291,7 @@ function listSettingsHtml() {
     ${isInbox ? '' : `<div class="row"><label>Name</label><input data-field="ls:name" value="${esc(l.name)}" aria-label="List name"></div>
     <div class="row"><label>Folder</label><select data-field="ls:folder" aria-label="Folder"><option value="">No folder</option>${folders().map((f) => `<option value="${f.id}" ${l.folderId === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></div>
     <div class="row"><label>Colour</label><div class="swatches">${swatch(COLORS, l.color, 'ls-color')}</div></div>`}
-    ${l.kind === 'tasks' ? `<div class="row"><label>Sections</label><div class="subs">${secs.map((s) => `<div class="sub"><input data-field="ls:secname" data-id="${s.id}" value="${esc(s.name)}" aria-label="Section name"><button class="icon-btn sm" data-act="ls-delsec" data-id="${s.id}" aria-label="Delete section">${icons.x}</button></div>`).join('')}<input class="sub-add" data-field="ls:addsec" placeholder="Add a section" aria-label="Add section"></div></div>` : ''}
+    ${l.kind === 'tasks' ? `<div class="row"><label>Sections</label><div class="subs">${secs.map((s) => `<div class="sub"><input data-field="ls:secname" data-id="${s.id}" value="${esc(s.name)}" aria-label="Section name"><button class="icon-btn sm" data-act="ls-secmove" data-dir="-1" data-id="${s.id}" aria-label="Move section up">${icons.up}</button><button class="icon-btn sm" data-act="ls-secmove" data-dir="1" data-id="${s.id}" aria-label="Move section down" style="transform:scaleY(-1)">${icons.up}</button><button class="icon-btn sm" data-act="ls-delsec" data-id="${s.id}" aria-label="Delete section">${icons.x}</button></div>`).join('')}<input class="sub-add" data-field="ls:addsec" placeholder="Add a section" aria-label="Add section"></div></div>` : ''}
     ${isInbox ? '' : `<div class="sheet-foot"><span></span><button class="btn danger ghost" data-act="ls-del" data-id="${l.id}">${icons.trash} Delete list</button></div>`}`;
 }
 registerFields({
@@ -321,4 +325,22 @@ registerFields({ 'folder:name': (el) => { if (el.value.trim()) S.patch('folders'
 registerActions({
   'folder-open': (el) => openFolder(el.dataset.id),
   'folder-del': (el) => { if (!armed(el, 'Tap again to delete')) return; S.live('lists').filter((l) => l.folderId === folderId).forEach((l) => S.patch('lists', l.id, { folderId: null })); S.remove('folders', folderId); closeSheet(); },
+});
+
+registerDnd('tasks', ({ id, zone, zoneIds }) => {
+  const get = (x) => S.get('tasks', x)?.sortOrder ?? 0;
+  const upd = computeOrder(zoneIds, id, get);
+  S.putMany('tasks', Object.entries(upd).map(([tid, sortOrder]) => ({ id: tid, sortOrder, ...(tid === id ? { sectionId: zone || null } : {}) })));
+});
+
+// sections: move up / down from the list settings sheet
+registerActions({
+  'ls-secmove': (el) => {
+    const secs = S.live('sections').filter((s) => s.listId === settingsListId).sort(S.byOrder);
+    const i = secs.findIndex((s) => s.id === el.dataset.id); const j = i + Number(el.dataset.dir);
+    if (i < 0 || j < 0 || j >= secs.length) return;
+    [secs[i], secs[j]] = [secs[j], secs[i]];
+    S.putMany('sections', secs.map((s, n) => ({ id: s.id, sortOrder: n * 1e9 })));
+    refreshSheet();
+  },
 });
