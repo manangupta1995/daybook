@@ -365,3 +365,4 @@ body.dragging [data-dnd-zone]{outline:0}
 .ad-chip.p1{border-left-color:var(--p1)}.ad-chip.p2{border-left-color:var(--p2)}.ad-chip.p3{border-left-color:var(--p3)}.ad-chip.done{text-decoration:line-through;opacity:.55}
 #toast.has-action{pointer-events:auto}
 #toast button{margin-left:12px;font:700 14px var(--font);color:var(--accent);background:none;border:0;padding:0 2px;text-decoration:underline}
+.timein{min-width:0;width:100%}

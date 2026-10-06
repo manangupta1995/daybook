@@ -1,5 +1,5 @@
 // Habit tracker: daily list, per-habit detail with history, editor.
-import { esc, uid, today, addDays, ymd, parseYmd, friendlyDate, fmtTime, MONTHS_LONG, DOW_SHORT } from './util.js';
+import { esc, uid, today, addDays, ymd, parseYmd, friendlyDate, fmtTime, parseTime, MONTHS_LONG, DOW_SHORT } from './util.js';
 import * as S from './store.js';
 import { registerDnd } from './dnd.js';
 import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, uiGet, uiSet, toast } from './ui.js';
@@ -119,7 +119,7 @@ function editorHtml() {
     <div class="row three"><div><label>Daily goal</label><input type="number" min="1" inputmode="decimal" data-field="hb:goal" value="${e.goal}" aria-label="Daily goal"></div>${e.entry === 'steps' ? `<div><label>Step</label><input type="number" min="0.01" inputmode="decimal" data-field="hb:step" value="${e.step}" aria-label="Step per tap"></div>` : '<div></div>'}<div><label>Unit</label><input data-field="hb:unit" value="${esc(e.unit)}" placeholder="mg, min…" aria-label="Unit"></div></div>` : ''}
     <div class="row"><label>Repeat</label><div class="seg"><button class="${e.schedule.freq === 'daily' ? 'on' : ''}" data-act="hb-freq" data-f="daily">Every day</button><button class="${e.schedule.freq === 'weekly' ? 'on' : ''}" data-act="hb-freq" data-f="weekly">Chosen days</button></div></div>
     ${e.schedule.freq === 'weekly' ? `<div class="daychips">${[1, 2, 3, 4, 5, 6, 0].map((n) => `<button class="${days.includes(n) ? 'on' : ''}" data-act="hb-day" data-n="${n}" aria-pressed="${days.includes(n)}">${DOW_SHORT[n]}</button>`).join('')}</div>` : ''}
-    <div class="row"><label>Reminders</label><div class="subs">${e.reminders.map((r, i) => `<div class="sub"><input type="time" data-field="hb:rem" data-i="${i}" value="${r}" aria-label="Reminder time"><button class="icon-btn sm" data-act="hb-delrem" data-i="${i}" aria-label="Remove reminder">${icons.x}</button></div>`).join('')}<button class="btn ghost small" data-act="hb-addrem">${icons.plus} Add reminder time</button></div></div>
+    <div class="row"><label>Reminders</label><div class="subs">${e.reminders.map((r, i) => `<div class="sub"><input type="text" class="timein" data-field="hb:rem" data-i="${i}" value="${esc(fmtTime(r))}" placeholder="e.g. 8pm" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="Reminder time (type it)"><button class="icon-btn sm" data-act="hb-delrem" data-i="${i}" aria-label="Remove reminder">${icons.x}</button></div>`).join('')}<button class="btn ghost small" data-act="hb-addrem">${icons.plus} Add reminder time</button></div></div>
     <div class="row"><label>Colour</label><div class="swatches">${swatch(COLORS, e.color, 'hb-color')}</div></div>
     <div class="sheet-foot">${e.isNew ? '<span></span>' : `<span class="foot-actions"><button class="btn ghost small" data-act="hb-archive">${e.archived ? 'Unarchive' : 'Archive'}</button><button class="btn danger ghost small" data-act="hb-del">${icons.trash} Delete</button></span>`}<button class="btn" data-act="hb-save">Save</button></div>`;
 }
@@ -128,7 +128,7 @@ registerFields({
   'hb:goal': (el) => { editing.goal = Math.max(1, Number(el.value) || 1); },
   'hb:step': (el) => { editing.step = Math.max(0.01, Number(el.value) || 1); },
   'hb:unit': (el) => { editing.unit = el.value.trim(); },
-  'hb:rem': (el) => { editing.reminders[Number(el.dataset.i)] = el.value; },
+  'hb:rem': (el) => { const v = parseTime(el.value); if (v) editing.reminders[Number(el.dataset.i)] = v; else toast("Couldn't read that time. Try 8pm or 20:00"); refreshSheet(); },
 });
 registerActions({
   'habit-new': () => openHabitEditor(null),

@@ -1,5 +1,5 @@
 // Task views: Today, list, tag; task sheet; list/folder management.
-import { esc, uid, today, addDays, diffDays, friendlyDate, fmtTime, weekday } from './util.js';
+import { esc, uid, today, addDays, diffDays, friendlyDate, fmtTime, parseTime, weekday } from './util.js';
 import * as S from './store.js';
 import { registerDnd, computeOrder } from './dnd.js';
 import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, focusField, uiGet, uiSet, toast } from './ui.js';
@@ -147,7 +147,7 @@ function taskSheetHtml(id) {
       <input class="title-input" data-field="task:title" value="${esc(t.title)}" placeholder="${isNote ? 'Note title' : 'Task title'}" aria-label="Title">
       <button class="icon-btn" data-act="sheet-close" aria-label="Close">${icons.x}</button></div>
     ${isNote ? '' : `<div class="row"><label>Date</label>
-      <div class="inline"><input type="date" data-field="task:date" value="${t.date || ''}" aria-label="Date"><input type="time" data-field="task:time" value="${t.time || ''}" aria-label="Time"></div></div>
+      <div class="inline"><input type="date" data-field="task:date" value="${t.date || ''}" aria-label="Date"><input type="text" class="timein" data-field="task:time" value="${esc(fmtTime(t.time))}" placeholder="Time, e.g. 3:30pm" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="Time (type it, e.g. 3:30pm or 15:30)"></div></div>
       <div class="quick-dates"><button data-act="task-date" data-d="today">Today</button><button data-act="task-date" data-d="tomorrow">Tomorrow</button><button data-act="task-date" data-d="nextweek">Next week</button><button data-act="task-date" data-d="none">Clear</button></div>
       <div class="row two"><div><label>Duration</label><select data-field="task:duration" aria-label="Duration">${[['', 'None'], [15, '15 min'], [30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1.5 hours'], [120, '2 hours']].map(([v, l]) => `<option value="${v}" ${String(t.duration ?? '') === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div><label>Reminder</label><select data-field="task:reminder" aria-label="Reminder">${[['', 'None'], [0, 'At time'], [5, '5 min before'], [10, '10 min before'], [30, '30 min before'], [60, '1 hour before'], [1440, '1 day before']].map(([v, l]) => `<option value="${v}" ${String(rem ?? '') === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
@@ -169,7 +169,11 @@ const upd = (f) => { if (openId) S.patch('tasks', openId, f); };
 registerFields({
   'task:title': (el) => { upd({ title: el.value.trim() }); },
   'task:date': (el) => { upd({ date: el.value || null, ...(el.value ? {} : { time: null }) }); refreshSheet(); },
-  'task:time': (el) => { const t = S.get('tasks', cur()); upd({ time: el.value || null, ...(el.value && !t.date ? { date: today() } : {}) }); refreshSheet(); },
+  'task:time': (el) => {
+    const t = S.get('tasks', cur()); const raw = el.value.trim(); const v = raw ? parseTime(raw) : null;
+    if (raw && !v) { toast("Couldn't read that time. Try 3:30pm or 15:30"); refreshSheet(); return; }
+    upd({ time: v, ...(v && !t.date ? { date: today() } : {}) }); refreshSheet();
+  },
   'task:duration': (el) => upd({ duration: el.value ? Number(el.value) : null }),
   'task:reminder': (el) => { upd({ reminder: el.value === '' ? null : Number(el.value) }); const t = S.get('tasks', cur()); if (t.reminder !== null && !t.date) { upd({ date: today() }); refreshSheet(); } },
   'task:notes': (el) => upd({ notes: el.value }),

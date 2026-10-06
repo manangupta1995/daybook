@@ -41,3 +41,17 @@ export function fmtTime(t) {
 }
 
 export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+// Typed time -> "HH:MM" (24h). Accepts 3pm, 3:30 pm, 15:30, 1530, 930a, noon, midnight. Returns null if unreadable.
+export function parseTime(s) {
+  s = String(s ?? '').trim().toLowerCase().replace(/\./g, '');
+  if (s === 'noon') return '12:00';
+  if (s === 'midnight') return '00:00';
+  const m = s.match(/^(\d{1,2})(?::?(\d{2}))?\s*([ap])?m?$/);
+  if (!m) return null;
+  let h = Number(m[1]); const min = m[2] ? Number(m[2]) : 0;
+  if (min > 59) return null;
+  if (m[3]) { if (h < 1 || h > 12) return null; h = (h % 12) + (m[3] === 'p' ? 12 : 0); }
+  else if (h > 23) return null;
+  return `${p2(h)}:${p2(min)}`;
+}
