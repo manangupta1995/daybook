@@ -30,11 +30,11 @@ function dueChip(t) {
   return `<span class="chip ${cls}">${icons.calendar}${esc(friendlyDate(t.date))}${t.time ? ' · ' + fmtTime(t.time) : ''}</span>`;
 }
 
-export function taskRow(t, { showList = false, indent = false, drag = false } = {}) {
+export function taskRow(t, { showList = false, indent = false, drag = false, calDrag = false } = {}) {
   const kids = S.live('tasks').filter((k) => k.parentId === t.id);
   const doneKids = kids.filter((k) => k.done).length;
   const list = showList ? S.get('lists', t.listId) : null;
-  return `<div class="task p${t.priority} ${t.done ? 'done' : ''} ${indent ? 'indent' : ''}" data-id="${t.id}">
+  return `<div class="task p${t.priority} ${t.done ? 'done' : ''} ${indent ? 'indent' : ''}" data-id="${t.id}" ${calDrag ? 'data-cal-src' : ''}>
     <button class="chk" data-act="task-toggle" data-id="${t.id}" aria-label="${t.done ? 'Mark not done' : 'Mark done'}">${t.done ? icons.check : ''}</button>
     <div class="tbody" data-act="task-open" data-id="${t.id}">
       <div class="ttitle">${esc(t.title) || '<i>Untitled</i>'}</div>

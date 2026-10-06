@@ -280,7 +280,7 @@ body.sheet-open{overflow:hidden}
 .seg.slim{padding:2px}.seg.slim button{min-height:34px;padding:0 12px;font-size:13px}
 .head-actions .seg{margin-right:6px}
 .allday{margin-bottom:14px}.allday>h3{font:700 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 2px 6px}
-.timeline{display:grid;grid-template-columns:48px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.timeline{display:grid;grid-template-columns:var(--g,48px) repeat(var(--n,1),minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .tl-hours{border-right:1px solid var(--line)}
 .tl-hour{height:var(--h);position:relative;border-bottom:1px solid var(--line)}
 .tl-hour span{position:absolute;top:4px;right:6px;font:600 11px var(--mono);color:var(--muted)}
@@ -333,3 +333,35 @@ body.dragging .group.zone-empty>h3{display:none}
 body.dragging [data-dnd-zone]{outline:0}
 @media (prefers-reduced-motion:no-preference){.dnd-ghost{transition:none}}
 @media (pointer:coarse){.grip{width:38px;height:44px;opacity:.8}.grip .ic{width:20px;height:20px}}
+
+/* ---- calendar drag + week view ---- */
+.timeline.wk{--g:34px}
+.timeline.wk .tl-hour span{right:3px;font-size:9px}
+.tl-col{border-right:1px solid var(--line);min-width:0}.tl-col:last-child{border-right:0}
+.tl-col.is-today{background-color:color-mix(in srgb,var(--accent) 5%,transparent)}
+.tl-col.drop{background-color:color-mix(in srgb,var(--accent) 9%,transparent)}
+.timeline.wk .tl-task{padding:2px 4px;font-size:11px;border-left-width:3px}
+.timeline.wk .tl-task span{display:none}
+.tl-task{touch-action:pan-y}
+.tl-resize{position:absolute;left:0;right:0;bottom:0;height:10px;cursor:ns-resize;touch-action:none}
+.tl-resize::after{content:"";position:absolute;left:50%;bottom:2px;width:22px;height:3px;margin-left:-11px;border-radius:2px;background:var(--muted);opacity:.5}
+@media (pointer:coarse){.tl-resize{height:16px}}
+.tl-preview{position:absolute;left:2px;right:2px;z-index:3;border:2px dashed var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 14%,transparent);font:700 11px var(--mono);color:var(--accent);padding:2px 5px;pointer-events:none;overflow:hidden}
+.cal-ghost{position:fixed!important;z-index:200;pointer-events:none;box-shadow:var(--shadow);opacity:.95;transform:scale(1.03);border-radius:10px}
+.cal-ghost.pill{width:auto;height:auto;font-size:11px;padding:2px 8px;background:var(--surface);border:1px solid var(--line)}
+.cal-ghost.task{background:var(--surface)}
+.cal-src{opacity:.35}
+[data-cal-src],[data-cal-resize]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.cell.drop,.ad-cell.drop,.allday.drop{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
+.allday.zone-empty{min-height:34px;border:1.5px dashed var(--line);border-radius:12px;padding:6px 10px;display:block}
+.allday.zone-empty>h3{margin:0}
+.wk-top{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));margin-bottom:6px}
+.wk-cell{min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:0 1px}
+.wk-day{display:flex;flex-direction:column;align-items:center;padding:2px 0;border-radius:10px;font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.wk-day b{font-size:15px;color:var(--ink);width:26px;height:26px;display:grid;place-items:center;border-radius:50%}
+.wk-day.today b{background:var(--accent);color:var(--accent-ink)}
+.ad-cell{min-height:26px;display:flex;flex-direction:column;gap:2px;border-radius:8px;padding:1px}
+.ad-chip{font-size:10px;font-weight:600;text-align:left;padding:2px 4px;border-radius:5px;background:var(--surface2);border-left:3px solid var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
+.ad-chip.p1{border-left-color:var(--p1)}.ad-chip.p2{border-left-color:var(--p2)}.ad-chip.p3{border-left-color:var(--p3)}.ad-chip.done{text-decoration:line-through;opacity:.55}
+#toast.has-action{pointer-events:auto}
+#toast button{margin-left:12px;font:700 14px var(--font);color:var(--accent);background:none;border:0;padding:0 2px;text-decoration:underline}

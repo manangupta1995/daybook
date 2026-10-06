@@ -41,13 +41,19 @@ export function dispatchAction(el, ev) {
 
 // ---- toast ----
 let toastTimer;
-export function toast(msg) {
+let toastUndo = null;
+export function toast(msg, undo = null) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  toastUndo = undo;
+  t.innerHTML = '';
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  if (undo) { const b = document.createElement('button'); b.type = 'button'; b.dataset.act = 'toast-undo'; b.textContent = 'Undo'; t.appendChild(b); }
+  t.classList.toggle('has-action', !!undo);
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => t.classList.remove('show'), undo ? 6000 : 2600);
 }
+registerActions({ 'toast-undo': () => { const f = toastUndo; toastUndo = null; document.getElementById('toast').classList.remove('show'); f?.(); } });
 
 // ---- sheet (bottom sheet on phone, side drawer on desktop) ----
 let sheetRender = null;
