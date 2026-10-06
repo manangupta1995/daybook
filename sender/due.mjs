@@ -48,7 +48,7 @@ export function computeDue(db, { from, to, tz, defaultTime = '09:00' }) {
     if (fire <= from || fire > to || fire <= Date.parse(t.updatedAt || 0)) continue;
     const list = lists[t.listId]?.name;
     const when = t.reminder ? `Due ${t.time ? fmtTime(t.time) : 'today'}` : (t.time ? fmtTime(t.time) : 'Due today');
-    out.push({ key: `t:${t.id}:${fire}`, title: t.title || 'Task', body: [when, list].filter(Boolean).join(' · '), url: `./#/today`, tag: `task-${t.id}` });
+    out.push({ fire, key: `t:${t.id}:${fire}`, title: t.title || 'Task', body: [when, list].filter(Boolean).join(' · '), url: `./#/today`, tag: `task-${t.id}` });
   }
   const days = [localDate(from, tz), localDate(to, tz)];
   const dates = [...new Set(days)];
@@ -59,7 +59,7 @@ export function computeDue(db, { from, to, tz, defaultTime = '09:00' }) {
       for (const r of h.reminders) {
         const fire = zonedEpoch(date, r, tz);
         if (fire <= from || fire > to || fire <= Date.parse(h.updatedAt || 0)) continue;
-        out.push({ key: `h:${h.id}:${date}:${r}`, title: h.name, body: h.type === 'amount' ? `Goal: ${h.goal}${h.unit && h.unit !== 'Count' ? ' ' + h.unit : ''}. Not logged yet.` : 'Not done yet today.', url: `./#/habits`, tag: `habit-${h.id}` });
+        out.push({ fire, key: `h:${h.id}:${date}:${r}`, title: h.name, body: h.type === 'amount' ? `Goal: ${h.goal}${h.unit && h.unit !== 'Count' ? ' ' + h.unit : ''}. Not logged yet.` : 'Not done yet today.', url: `./#/habits`, tag: `habit-${h.id}` });
       }
     }
   }

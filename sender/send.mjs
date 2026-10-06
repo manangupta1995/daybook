@@ -5,7 +5,9 @@ import { sendPush } from './webpush.mjs';
 const { DATA_TOKEN, VAPID_PRIVATE_KEY, VAPID_SUBJECT = 'https://manangupta1995.github.io/daybook/' } = process.env;
 const REPO = process.env.DATA_REPO || 'manangupta1995/daybook-data';
 const DEFAULT_TZ = 'America/Los_Angeles';
-const MAX_CATCHUP = 2 * 3600e3;
+// GitHub's scheduler often skips hours, so catch up on up to a day of missed reminders (they are labelled as missed).
+const MAX_CATCHUP = 24 * 3600e3;
+const COLD_START = 3 * 3600e3;
 
 if (!DATA_TOKEN || !VAPID_PRIVATE_KEY) { console.log('Missing DATA_TOKEN or VAPID_PRIVATE_KEY. Add them as repository secrets. Nothing sent.'); process.exit(0); }
 
@@ -30,9 +32,10 @@ if (!VAPID_PUBLIC_KEY) { console.log('No reminder keys generated yet (Settings â
 const devices = Object.values(db.devices || {}).filter((d) => !d.deleted && d.endpoint);
 if (!devices.length) { console.log('No subscribed devices.'); process.exit(0); }
 
-const from = Math.max(state?.lastRun || now - 10 * 60e3, now - MAX_CATCHUP);
+const from = Math.max(state?.lastRun ?? now - COLD_START, now - MAX_CATCHUP);
 const tz = devices[0].tz || DEFAULT_TZ;
-const due = computeDue(db, { from, to: now, tz });
+const fmt = (e) => new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(new Date(e));
+const due = computeDue(db, { from, to: now, tz }).map((n) => (now - n.fire > 10 * 60e3 ? { ...n, body: `Missed at ${fmt(n.fire)}. ${n.body}` } : n));
 console.log(`window ${Math.round((now - from) / 60e3)} min, ${devices.length} device(s), ${due.length} due`);
 if (!due.length) process.exit(0);
 

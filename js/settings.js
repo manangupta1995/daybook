@@ -40,7 +40,7 @@ function notifyCard() {
   else if (i.permission === 'denied') body = `<p class="muted">Notifications are blocked for Daybook. On iPhone open Settings → Notifications → Daybook and allow them, then come back.</p>`;
   else if (!i.subscribed) body = `<p class="muted">Get a notification for task reminders and habit reminder times. Turn this on <b>only on your phone</b>.</p><div class="btnrow"><button class="btn" data-act="push-on">Turn on reminders on this device</button></div>`;
   else body = `<div class="syncline ok"><span class="dot"></span><span>Reminders are on for this device</span></div><div class="btnrow"><button class="btn ghost" data-act="push-test">Show a test notification</button><button class="btn danger ghost" data-act="push-off">Turn off</button></div>`;
-  return `<section class="card"><h3>Reminders</h3>${keysBlock()}${push.hasKeys() && !freshKeys ? body : ''}<p class="muted small">${devices.length ? `${devices.length} device${devices.length === 1 ? '' : 's'} registered (${esc(devices.map((d) => d.name).join(', '))}). ` : ''}A scheduled job on GitHub sends them, so one can arrive a few minutes after its time.</p></section>`;
+  return `<section class="card"><h3>Reminders</h3>${keysBlock()}${push.hasKeys() && !freshKeys ? body : ''}<p class="muted small">${devices.length ? `${devices.length} device${devices.length === 1 ? '' : 's'} registered (${esc(devices.map((d) => d.name).join(', '))}). ` : ''}A background job checks for due reminders and sends them to this device.</p></section>`;
 }
 
 export function renderSettings() {
