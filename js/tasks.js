@@ -114,7 +114,7 @@ export function renderList(id) {
   const doneAll = tops.filter((t) => t.done);
   const nDone = all.filter((t) => t.done).length;
   if (!body && !nDone) body = `<div class="empty">${icons.list}<p>This list is empty.</p></div>`;
-  const doneBlock = nDone ? `<details class="group done-group" ${showDone ? 'open' : ''} data-done="${id}"><summary>Completed<span class="count">${nDone}</span></summary>${sortTasks(doneAll, 'manual').sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || '')).map((t) => taskRow(t)).join('')}</details>` : '';
+  const doneBlock = nDone ? `<details class="group done-group" ${showDone ? 'open' : ''} data-done="${id}"><summary>Completed<span class="count">${nDone}</span><button class="mini clear-done" data-act="list-clear-done" data-id="${id}" aria-label="Delete all completed tasks in this list">Clear all</button></summary>${sortTasks(doneAll, 'manual').sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || '')).map((t) => taskRow(t)).join('')}</details>` : '';
   return `${head}${quickAdd('list:' + id)}${body}${doneBlock}`;
 }
 
@@ -208,6 +208,16 @@ registerActions({
   'task-rmtag': (el) => { const t = S.get('tasks', cur()); upd({ tags: (t.tags || []).filter((g) => g !== el.dataset.tag) }); refreshSheet(); },
   'task-delsub': (el) => { S.remove('tasks', el.dataset.id); refreshSheet(); },
   'task-del': (el) => { if (!armed(el, 'Tap again to delete')) return; S.remove('tasks', el.dataset.id); closeSheet(); toast('Task deleted'); },
+  'list-clear-done': (el, ev) => {
+    ev?.preventDefault(); ev?.stopPropagation(); // the button sits inside <summary>: don't toggle the section
+    const id = el.dataset.id;
+    const done = S.live('tasks').filter((t) => t.listId === id && t.done);
+    if (!done.length) return;
+    if (!armed(el, `Tap again to delete ${done.length}`)) return;
+    const snap = done.map((t) => ({ ...t }));
+    done.forEach((t) => { if (S.get('tasks', t.id)) S.remove('tasks', t.id); });
+    toast(`Deleted ${snap.length} completed task${snap.length === 1 ? '' : 's'}`, () => { S.putMany('tasks', snap); rerender(); });
+  },
   'list-sort': (el) => {
     const id = el.dataset.id; const cur2 = uiGet('sort:' + id, 'manual');
     uiSet('sort:' + id, cur2 === 'manual' ? 'date' : cur2 === 'date' ? 'priority' : 'manual'); rerender();

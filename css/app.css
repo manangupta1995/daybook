@@ -366,3 +366,5 @@ body.dragging [data-dnd-zone]{outline:0}
 #toast.has-action{pointer-events:auto}
 #toast button{margin-left:12px;font:700 14px var(--font);color:var(--accent);background:none;border:0;padding:0 2px;text-decoration:underline}
 .timein{min-width:0;width:100%}
+details.group>summary .clear-done{width:auto;height:auto;margin-left:auto;padding:4px 10px;font:700 11px var(--font);letter-spacing:.04em;text-transform:none;color:var(--muted);border:1px solid var(--line)}
+details.group>summary .clear-done.armed{color:var(--danger);border-color:var(--danger)}
