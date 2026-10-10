@@ -2,7 +2,7 @@
 import { esc, uid, today, addDays, ymd, parseYmd, friendlyDate, fmtTime, parseTime, MONTHS_LONG, DOW_SHORT } from './util.js';
 import * as S from './store.js';
 import { registerDnd } from './dnd.js';
-import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, uiGet, uiSet, toast } from './ui.js';
+import { icons, grip, registerActions, registerFields, openSheet, refreshSheet, closeSheet, swatch, COLORS, armed, rerender, focusField, uiGet, uiSet, toast } from './ui.js';
 import { getCfg } from './sync.js';
 
 let day = today();       // date being tracked on the main screen
@@ -39,8 +39,22 @@ function card(h, d, { drag = false, dim = false } = {}) {
     ${control(h, d)}</div>`;
 }
 
+// Habits due on the day, laid out in their groups. With no groups it is one plain list, as before.
+// A habit whose group was deleted (maybe on another device) counts as ungrouped.
+function dueBlock(due, groups, d) {
+  const gidOf = (h) => (h.groupId && groups.some((g) => g.id === h.groupId) ? h.groupId : '');
+  if (!groups.length) return `<div class="hzone" data-dnd-zone data-group="habits" data-zone="">${due.map((h) => card(h, d, { drag: true })).join('')}</div>`;
+  const part = (gid, title) => {
+    const arr = due.filter((h) => gidOf(h) === gid);
+    const done = arr.filter((h) => S.isDone(h, d)).length;
+    return `<section class="group hgroup ${arr.length ? '' : 'zone-empty'}" data-dnd-zone data-group="habits" data-zone="${gid}"><h3>${esc(title)}<span class="count">${done}/${arr.length}</span></h3>${arr.map((h) => card(h, d, { drag: true })).join('')}</section>`;
+  };
+  return part('', 'No group') + groups.map((g) => part(g.id, g.name)).join('');
+}
+
 export function renderHabits() {
   const all = S.live('habits').sort(S.byOrder);
+  const groups = S.live('habitGroups').sort(S.byOrder);
   const active = all.filter((h) => !h.archived);
   const due = active.filter((h) => S.isDue(h, day));
   const other = active.filter((h) => !S.isDue(h, day));
@@ -48,9 +62,9 @@ export function renderHabits() {
   const archived = all.filter((h) => h.archived);
   const isToday = day === today();
   return `<div class="page-head"><div><h1>Habits</h1><p class="sub">${due.length ? `${done} of ${due.length} done` : 'Nothing scheduled'}</p></div>
-      <div class="head-actions"><button class="icon-btn" data-act="habit-new">${icons.plus} New</button></div></div>
+      <div class="head-actions"><button class="icon-btn" data-act="habit-groups">Groups</button><button class="icon-btn" data-act="habit-new">${icons.plus} New</button></div></div>
     <div class="daynav"><button class="icon-btn" data-act="habit-day" data-n="-1" aria-label="Previous day">${icons.chevL}</button><button class="daylabel" data-act="habit-day" data-n="0">${esc(friendlyDate(day))}${isToday ? '' : ' · back to today'}</button><button class="icon-btn" data-act="habit-day" data-n="1" aria-label="Next day" ${day >= today() ? 'disabled' : ''}>${icons.chevR}</button></div>
-    <div class="hzone" data-dnd-zone data-group="habits" data-zone="due">${due.map((h) => card(h, day, { drag: true })).join('')}</div>${due.length ? '' : '<div class="empty">' + icons.habit + '<p>No habits due this day.</p></div>'}
+    ${dueBlock(due, groups, day)}${due.length ? '' : '<div class="empty">' + icons.habit + '<p>No habits due this day.</p></div>'}
     ${other.length ? `<h3 class="sechead">Not scheduled</h3><div class="hzone" data-dnd-zone data-group="habits" data-zone="other">${other.map((h) => card(h, day, { drag: true, dim: true })).join('')}</div>` : ''}
     ${archived.length ? `<details class="group"><summary>Archived<span class="count">${archived.length}</span></summary>${archived.map((h) => card(h, day)).join('')}</details>` : ''}`;
 }
@@ -105,7 +119,7 @@ registerActions({
 });
 
 // ---------- editor ----------
-const blank = () => ({ id: uid(), name: '', color: COLORS[0], type: 'check', entry: 'total', goal: 1, step: 1, unit: '', schedule: { freq: 'daily', interval: 1 }, reminders: [], startDate: today(), archived: false, sortOrder: Date.now(), isNew: true });
+const blank = () => ({ id: uid(), name: '', color: COLORS[0], type: 'check', entry: 'total', goal: 1, step: 1, unit: '', schedule: { freq: 'daily', interval: 1 }, reminders: [], startDate: today(), groupId: null, archived: false, sortOrder: Date.now(), isNew: true });
 export function openHabitEditor(id) {
   editing = id ? JSON.parse(JSON.stringify(S.get('habits', id))) : blank();
   openSheet(editorHtml);
@@ -114,6 +128,7 @@ function editorHtml() {
   const e = editing; const days = e.schedule?.days || [];
   return `<div class="sheet-head"><h2>${e.isNew ? 'New habit' : 'Edit habit'}</h2><button class="icon-btn" data-act="sheet-close" aria-label="Close">${icons.x}</button></div>
     <div class="row"><label>Name</label><input data-field="hb:name" value="${esc(e.name)}" placeholder="e.g. Read a book" aria-label="Habit name"></div>
+    ${S.live('habitGroups').length ? `<div class="row"><label>Group</label><select data-field="hb:group" aria-label="Group"><option value="">No group</option>${S.live('habitGroups').sort(S.byOrder).map((g) => `<option value="${g.id}" ${g.id === e.groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></div>` : ''}
     <div class="row"><label>Type</label><div class="seg"><button class="${e.type === 'check' ? 'on' : ''}" data-act="hb-type" data-t="check">Done / not done</button><button class="${e.type === 'amount' ? 'on' : ''}" data-act="hb-type" data-t="amount">Amount</button></div></div>
     ${e.type === 'amount' ? `<div class="row"><label>Logging</label><div class="seg"><button class="${e.entry !== 'steps' ? 'on' : ''}" data-act="hb-entry" data-e="total">Type the day's total</button><button class="${e.entry === 'steps' ? 'on' : ''}" data-act="hb-entry" data-e="steps">Tap + / −</button></div></div>
     <div class="row three"><div><label>Daily goal</label><input type="number" min="1" inputmode="decimal" data-field="hb:goal" value="${e.goal}" aria-label="Daily goal"></div>${e.entry === 'steps' ? `<div><label>Step</label><input type="number" min="0.01" inputmode="decimal" data-field="hb:step" value="${e.step}" aria-label="Step per tap"></div>` : '<div></div>'}<div><label>Unit</label><input data-field="hb:unit" value="${esc(e.unit)}" placeholder="mg, min…" aria-label="Unit"></div></div>` : ''}
@@ -125,6 +140,7 @@ function editorHtml() {
 }
 registerFields({
   'hb:name': (el) => { editing.name = el.value; },
+  'hb:group': (el) => { editing.groupId = el.value || null; },
   'hb:goal': (el) => { editing.goal = Math.max(1, Number(el.value) || 1); },
   'hb:step': (el) => { editing.step = Math.max(0.01, Number(el.value) || 1); },
   'hb:unit': (el) => { editing.unit = el.value.trim(); },
@@ -153,12 +169,43 @@ registerActions({
 });
 
 // Habits share one overall order. Put the moved habit next to the neighbour it was dropped beside, then renumber all.
-registerDnd('habits', ({ id, zoneIds }) => {
+registerDnd('habits', ({ id, zone, zoneIds }) => {
   const all = S.live('habits').filter((h) => !h.archived).sort(S.byOrder).map((h) => h.id).filter((x) => x !== id);
   const i = zoneIds.indexOf(id);
   const next = zoneIds[i + 1], prev = zoneIds[i - 1];
   if (next) all.splice(all.indexOf(next), 0, id);
   else if (prev) all.splice(all.indexOf(prev) + 1, 0, id);
   else all.push(id);
-  S.putMany('habits', all.map((hid, n) => ({ id: hid, sortOrder: n * 1e9 })));
+  const cur = S.get('habits', id)?.groupId || null;
+  const groupId = zone === 'other' ? cur : (zone || null); // dropping into "Not scheduled" keeps the group
+  S.putMany('habits', all.map((hid, n) => ({ id: hid, sortOrder: n * 1e9, ...(hid === id && groupId !== cur ? { groupId } : {}) })));
+});
+
+// ---------- groups ----------
+function groupsHtml() {
+  const gs = S.live('habitGroups').sort(S.byOrder);
+  return `<div class="sheet-head"><h2>Habit groups</h2><button class="icon-btn" data-act="sheet-close" aria-label="Close">${icons.x}</button></div>
+    <div class="row"><label>Groups</label><div class="subs">${gs.map((g) => `<div class="sub"><input data-field="hg:name" data-id="${g.id}" value="${esc(g.name)}" aria-label="Group name"><button class="icon-btn sm" data-act="hg-move" data-dir="-1" data-id="${g.id}" aria-label="Move group up">${icons.up}</button><button class="icon-btn sm" data-act="hg-move" data-dir="1" data-id="${g.id}" aria-label="Move group down" style="transform:scaleY(-1)">${icons.up}</button><button class="icon-btn sm" data-act="hg-del" data-id="${g.id}" aria-label="Delete group">${icons.x}</button></div>`).join('')}<input class="sub-add" data-field="hg:add" placeholder="Add a group, e.g. Morning" aria-label="Add group"></div></div>
+    <p class="meta-note">Drag a habit into a group on the Habits screen, or pick one when you edit it. Deleting a group keeps its habits.</p>`;
+}
+registerFields({
+  'hg:name': (el) => { if (el.value.trim()) S.patch('habitGroups', el.dataset.id, { name: el.value.trim() }); },
+  'hg:add': (el) => {
+    const v = el.value.trim(); if (!v) return;
+    const gs = S.live('habitGroups');
+    S.put('habitGroups', { id: uid(), name: v, sortOrder: (gs.length ? Math.max(...gs.map((g) => g.sortOrder ?? 0)) : 0) + 1 });
+    refreshSheet(); focusField('hg:add');
+  },
+});
+registerActions({
+  'habit-groups': () => openSheet(groupsHtml),
+  'hg-del': (el) => { S.remove('habitGroups', el.dataset.id); refreshSheet(); },
+  'hg-move': (el) => {
+    const gs = S.live('habitGroups').sort(S.byOrder);
+    const i = gs.findIndex((g) => g.id === el.dataset.id); const j = i + Number(el.dataset.dir);
+    if (i < 0 || j < 0 || j >= gs.length) return;
+    [gs[i], gs[j]] = [gs[j], gs[i]];
+    S.putMany('habitGroups', gs.map((g, n) => ({ id: g.id, sortOrder: n * 1e9 })));
+    refreshSheet();
+  },
 });

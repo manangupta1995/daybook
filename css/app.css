@@ -330,6 +330,7 @@ body.dragging *{cursor:grabbing!important}
 .group.zone-empty{display:none}
 body.dragging .group.zone-empty{display:block;min-height:26px;margin-bottom:8px;border:1.5px dashed var(--line);border-radius:12px}
 body.dragging .group.zone-empty>h3{display:none}
+body.dragging .hgroup.zone-empty>h3{display:flex;padding:2px 8px}
 body.dragging [data-dnd-zone]{outline:0}
 @media (prefers-reduced-motion:no-preference){.dnd-ghost{transition:none}}
 @media (pointer:coarse){.grip{width:38px;height:44px;opacity:.8}.grip .ic{width:20px;height:20px}}

@@ -1,7 +1,7 @@
 // Local data store: records carry updatedAt; deletes are tombstones; merge is newest-wins per record.
 import { uid, nowIso, today, addDays, weekday } from './util.js';
 
-export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'logs', 'devices', 'config'];
+export const COLLS = ['folders', 'lists', 'sections', 'tasks', 'habits', 'habitGroups', 'logs', 'devices', 'config'];
 const KEY = 'daybook.db.v2';
 const TOMBSTONE_DAYS = 90;
 
@@ -104,6 +104,9 @@ export function remove(coll, id) {
   }
   if (coll === 'sections') {
     live('tasks').filter((t) => t.sectionId === id).forEach((t) => put('tasks', { id: t.id, sectionId: null }));
+  }
+  if (coll === 'habitGroups') {
+    live('habits').filter((h) => h.groupId === id).forEach((h) => put('habits', { id: h.id, groupId: null }));
   }
   if (coll === 'habits') {
     Object.values(db.logs).filter((l) => l.habitId === id && !l.deleted).forEach((l) => tombstone('logs', `${l.habitId}|${l.date}`));
