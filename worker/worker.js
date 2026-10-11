@@ -3,8 +3,22 @@
 // Decides which reminders fire inside a time window. Pure functions, no network.
 const pad = (n) => String(n).padStart(2, '0');
 
+// Intl formatters are slow to build and the Worker has a tiny CPU budget, so build each once.
+const fmtCache = new Map();
+function formatter(tz, kind) {
+  const k = kind + '|' + tz;
+  let f = fmtCache.get(k);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', kind === 'full'
+      ? { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }
+      : { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+    fmtCache.set(k, f);
+  }
+  return f;
+}
+
 function offsetMs(epoch, tz) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(epoch)).map((x) => [x.type, x.value]));
+  const p = Object.fromEntries(formatter(tz, 'full').formatToParts(new Date(epoch)).map((x) => [x.type, x.value]));
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(epoch / 1000) * 1000;
 }
 
@@ -18,7 +32,7 @@ function zonedEpoch(date, time, tz) {
 }
 
 function localDate(epoch, tz) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(epoch)).map((x) => [x.type, x.value]));
+  const p = Object.fromEntries(formatter(tz, 'date').formatToParts(new Date(epoch)).map((x) => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}`;
 }
 const addDays = (s, n) => { const [y, m, d] = s.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`; };
@@ -43,8 +57,10 @@ const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h 
 function computeDue(db, { from, to, tz, defaultTime = '09:00' }) {
   const out = [];
   const lists = db.lists || {};
+  const lo = addDays(localDate(from, tz), -1); // a task fires at its date+time minus the reminder, so its date can't be before the window
   for (const t of live(db.tasks)) {
     if (t.done || t.reminder === null || t.reminder === undefined || !t.date) continue;
+    if (t.date < lo || t.date > addDays(localDate(to, tz), Math.ceil(t.reminder / 1440) + 1)) continue;
     if (lists[t.listId]?.kind === 'notes') continue;
     const fire = zonedEpoch(t.date, t.time || defaultTime, tz) - t.reminder * 60000;
     if (fire <= from || fire > to || fire <= Date.parse(t.updatedAt || 0)) continue;
