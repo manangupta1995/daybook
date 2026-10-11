@@ -88,8 +88,8 @@ function renderTimeline(dates) {
     return { d, all, timed, untimed: all.filter((t) => !t.time).sort(S.byOrder), items: layout(timed.map((t) => { const start = mins(t.time); return { t, start, end: Math.min(1440, start + Math.max(t.duration || 30, 15)) }; })) };
   });
   const everyItem = perDay.flatMap((p) => p.items);
-  const first = Math.min(7, ...everyItem.map((i) => Math.floor(i.start / 60)));
-  const last = Math.max(22, ...everyItem.map((i) => Math.ceil(i.end / 60) - 1));
+  const first = Math.min(4, ...everyItem.map((i) => Math.floor(i.start / 60)));
+  const last = Math.max(23, ...everyItem.map((i) => Math.ceil(i.end / 60) - 1));
   const base = first * 60;
   const hours = Array.from({ length: last - first + 1 }, (_, i) => first + i);
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
