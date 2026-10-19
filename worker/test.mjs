@@ -1,5 +1,6 @@
 // Runs the built worker against a fake GitHub + fake push service; the "phone" decrypts what it receives.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import worker from './worker.js';
 const subtle = globalThis.crypto.subtle;
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
@@ -35,7 +36,7 @@ const files = { 'data.json': { schema: 2, updatedAt: '2026-10-06T06:35:00Z',
   devices: { d1: { id: 'd1', name: 'iPhone', endpoint: 'https://push.example.test/d1', keys: { p256dh: b64u(uaPub), auth: b64u(auth) }, tz: 'America/Los_Angeles' } },
   lists: { inbox: { id: 'inbox', name: 'Inbox', kind: 'tasks' } },
   tasks: { q: { id: 'q', listId: 'inbox', title: 'Quantum study', date: '2026-10-06', time: '06:00', reminder: 0, done: false, updatedAt: '2026-10-06T06:35:08Z' } }, habits: {}, logs: {} } };
-const shas = {}; const pushes = []; let pushStatus = 201; const writes = [];
+const stats = { raw: 0, notModified: 0 }; const shas = {}; const pushes = []; let pushStatus = 201; const writes = [];
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
   if (url.startsWith('https://push.example.test')) { pushes.push({ url, headers: opts.headers, body: new Uint8Array(opts.body) }); return { status: pushStatus }; }
@@ -43,6 +44,11 @@ globalThis.fetch = async (url, opts = {}) => {
   assert.equal(opts.headers.Authorization, 'Bearer tok');
   if (!opts.method || opts.method === 'GET') {
     if (!files[name]) return { status: 404, ok: false };
+    if (opts.headers.Accept === 'application/vnd.github.raw+json') { // raw body + ETag, 304 when unchanged (like GitHub)
+      const et = 'W/"' + createHash('sha1').update(JSON.stringify(files[name])).digest('hex') + '"';
+      if (opts.headers['If-None-Match'] === et) { stats.notModified++; return { status: 304, ok: false }; }
+      stats.raw++; return { status: 200, ok: true, headers: { get: (k) => (k.toLowerCase() === 'etag' ? et : null) }, text: async () => JSON.stringify(files[name]) };
+    }
     return { status: 200, ok: true, json: async () => ({ sha: shas[name] || 's0', content: Buffer.from(JSON.stringify(files[name])).toString('base64') }) };
   }
   const b = JSON.parse(opts.body); files[name] = JSON.parse(Buffer.from(b.content, 'base64').toString()); shas[name] = 's' + (writes.length + 1); writes.push(name); return { status: 200 };
@@ -67,5 +73,29 @@ await worker.fetch(new Request('https://w.test/'), env); const late = await decr
 files['data.json'].tasks.again = { id: 'again', listId: 'inbox', title: 'Later', date: '2026-10-06', time: '06:30', reminder: 0, done: false, updatedAt: '2026-10-06T06:35:08Z' };
 Date.now = () => Date.parse('2026-10-06T13:30:20Z'); pushStatus = 410;
 await worker.fetch(new Request('https://w.test/'), env); assert.equal(files['data.json'].devices.d1.deleted, true); console.log('ok   expired device tombstoned');
+
+// --- CPU saving: unchanged data.json is not downloaded/parsed again (304) ---
+files['data.json'].devices.d1 = { id: 'd1', name: 'iPhone', endpoint: 'https://push.example.test/d1', keys: { p256dh: b64u(uaPub), auth: b64u(auth) }, tz: 'America/Los_Angeles' };
+pushStatus = 201; Date.now = () => Date.parse('2026-10-06T13:40:00Z');
+await worker.fetch(new Request('https://w.test/'), env);
+const before = { ...stats };
+await worker.fetch(new Request('https://w.test/'), env); await worker.fetch(new Request('https://w.test/'), env);
+assert.equal(stats.raw, before.raw); assert.equal(stats.notModified, before.notModified + 2); console.log('ok   unchanged data.json answers 304, nothing re-downloaded');
+files['data.json'].updatedAt = 'x'; await worker.fetch(new Request('https://w.test/'), env);
+assert.equal(stats.raw, before.raw + 1); console.log('ok   changed data.json is downloaded again');
+
+// --- recovery after a long outage (the 2026-10-17 case: Worker down 15:00-18:25, habit reminder at 16:00) ---
+files['data.json'].habits.p = { id: 'p', name: '38 pushups', type: 'check', goal: 1, schedule: { freq: 'daily', interval: 1 }, reminders: ['16:00'], startDate: '2026-08-16', archived: false, updatedAt: '2026-10-10T23:08:32Z' };
+files['state.json'] = { lastRun: Date.parse('2026-10-17T22:00:10Z') }; // 15:00:10 PDT, last successful advance
+Date.now = () => Date.parse('2026-10-18T01:25:30Z'); // 18:25:30 PDT, Worker is healthy again
+const n0 = pushes.length;
+r = await worker.fetch(new Request('https://w.test/'), env); assert.match(await r.text(), /sent 1/);
+const rec = await decrypt(pushes[n0].body); assert.equal(rec.title, '38 pushups'); assert.match(rec.body, /^Missed at 4:00 PM\. Not done yet today\./); console.log('ok   2h25m-late reminder is still delivered:', rec.body);
+// ...but not once it is older than the catch-up window
+files['state.json'] = { lastRun: Date.parse('2026-10-17T22:00:10Z') };
+Date.now = () => Date.parse('2026-10-18T02:30:30Z'); // 19:30:30 PDT, 3.5 h after the reminder
+const n1 = pushes.length;
+r = await worker.fetch(new Request('https://w.test/'), env); assert.match(await r.text(), /sent 0/); assert.equal(pushes.length, n1); console.log('ok   reminders older than 3 h are dropped');
+
 // scheduled() entry point
 Date.now = realNow; let waited; await worker.scheduled({}, env, { waitUntil: (p) => { waited = p; } }); await waited; console.log('ok   scheduled() entry point runs');

@@ -1,7 +1,12 @@
 // Cloudflare Worker: runs every minute (cron trigger), reads the private data repo, sends due reminders.
 // Secrets: DATA_TOKEN (GitHub fine-grained token, Contents read/write on daybook-data), VAPID_PRIVATE_KEY.
-const CATCHUP = 30 * 60e3;   // after an outage, catch up on up to 30 minutes
+const CATCHUP = 3 * 3600e3;  // after an outage, catch up on up to 3 hours (older ones are dropped)
 const COLD_START = 5 * 60e3; // first ever run
+
+// The free plan kills a run that uses more than ~10 ms of CPU, and downloading + decoding + parsing the whole
+// data.json every minute is the expensive part. So: fetch it as raw text (no base64 decode) and keep the parsed
+// copy in memory; GitHub answers 304 (no body) while the file is unchanged, and then nothing is parsed at all.
+let dbCache = null; // { etag, db }, lives as long as the Worker isolate does
 
 const b64dec = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g, '')), (c) => c.charCodeAt(0)));
 const b64enc = (s) => { let r = ''; new TextEncoder().encode(s).forEach((b) => { r += String.fromCharCode(b); }); return btoa(r); };
@@ -17,10 +22,23 @@ async function run(env) {
     return { data: JSON.parse(b64dec(j.content)), sha: j.sha };
   };
   const putJson = async (path, data, sha, message) => (await gh(path, { method: 'PUT', body: JSON.stringify({ message, content: b64enc(JSON.stringify(data, null, 1) + '\n'), ...(sha ? { sha } : {}) }) })).status;
+  const getDb = async () => {
+    const headers = { Accept: 'application/vnd.github.raw+json' };
+    if (dbCache?.etag) headers['If-None-Match'] = dbCache.etag;
+    const r = await gh('data.json', { headers });
+    if (r.status === 304 && dbCache) return dbCache.db;
+    dbCache = null;
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`GET data.json: ${r.status}`);
+    const db = JSON.parse(await r.text());
+    dbCache = { etag: r.headers?.get?.('etag') || null, db };
+    console.log('loaded data.json');
+    return db;
+  };
 
   if (!env.DATA_TOKEN || !env.VAPID_PRIVATE_KEY) { console.log('Missing DATA_TOKEN or VAPID_PRIVATE_KEY'); return { sent: 0 }; }
   const now = Date.now();
-  const [{ data: db }, { data: state, sha: stateSha }] = await Promise.all([getJson('data.json'), getJson('state.json')]);
+  const [db, { data: state, sha: stateSha }] = await Promise.all([getDb(), getJson('state.json')]);
   if (!db) return { sent: 0 };
   const publicKey = db.config?.push?.publicKey;
   const devices = Object.values(db.devices || {}).filter((d) => !d.deleted && d.endpoint);
@@ -52,6 +70,7 @@ async function run(env) {
     fresh.updatedAt = stamp;
     if ((await putJson('data.json', fresh, sha, 'reminders: remove expired device')) < 300) break;
   }
+  if (gone.size) dbCache = null; // we changed the file; reload next time
   return { sent };
 }
 
